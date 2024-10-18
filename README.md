@@ -4,9 +4,7 @@
 
 ### Variational optimization of iPEPS with the C3 honeycomb CTMRG
 
-This code is an adaptation of https://github.com/wangleiphy/tensorgrad/blob/master/README.md to the honeycomb lattice, using the honeycomb CTMRG rather then the square CTMRG.
-
-Run this to optimize an iPEPS wave function for 2D quantum Heisenberg model. 
+This code is an adaptation of https://github.com/wangleiphy/tensorgrad/blob/master/README.md to the honeycomb lattice, using the honeycomb CTMRG rather than the square CTMRG.
  
 Installation using conda:
 
@@ -16,7 +14,7 @@ conda activate var_ipeps
 pip install -r variational_iPEPS/requirements.txt
 ```
 
-To use the program_
+To use the program, run the following command:
 ```bash
 cd variational_iPEPS
 python variational.py -D 3 -chi 30 
