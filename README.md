@@ -18,7 +18,8 @@ pip install -r variational_iPEPS/requirements.txt
 
 To use the program_
 ```bash
-python variational_iPEPS/variational.py -D 3 -chi 30 
+cd variational_iPEPS
+python variational.py -D 3 -chi 30 
 ```
 
 Finally, delete the conda environment using
