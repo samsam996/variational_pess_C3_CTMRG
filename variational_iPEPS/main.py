@@ -50,6 +50,10 @@ if __name__=='__main__':
           + '_chi' + str(args.chi)
     if args.dtype=="float32": #(args.float32):
         key += '_float32'
+    elif args.dtype=="float64": #(args.float32):
+        key += '_float64'
+    if args.dtype=="cfloat": #(args.float32):
+        key += 'cfloat'    
     cmd = ['mkdir', '-p', key]
     subprocess.check_call(cmd)
 
@@ -111,7 +115,7 @@ if __name__=='__main__':
         En = 4
         Etmp = 5
         epoch = 0
-        while En < Etmp or abs(En - Etmp) < 1e-5:
+        while (En < Etmp or abs(En - Etmp) < 1e-5) and epoch < args.Nepochs:
             epoch = epoch + 1
         # for epoch in range(args.Nepochs):
             # Train step and get loss and magnetization values

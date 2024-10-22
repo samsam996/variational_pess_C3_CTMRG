@@ -1,5 +1,8 @@
 import re
 import torch
+from ipeps import honeycombiPEPS
+from args import args
+
 
 def kronecker_product(t1, t2):
     """
@@ -24,9 +27,13 @@ def kronecker_product(t1, t2):
 
 
 def save_checkpoint(checkpoint_path, model, optimizer):
+    
+    # Save the model and optimizer states in a dictionary
     state = {'state_dict': model.state_dict(),
              'optimizer' : optimizer.state_dict()}
+    
     #print(model.state_dict().keys())
+    # Save the state dictionary to a file
     torch.save(state, checkpoint_path)
 
     #print('model saved to %s' % checkpoint_path)
@@ -35,23 +42,23 @@ def save_checkpoint(checkpoint_path, model, optimizer):
 def load_checkpoint(checkpoint_path, args, model):
     print( 'load old model from %s ' % checkpoint_path )
     print( 'Dold = ', re.search('_D([0-9]*)_', checkpoint_path).group(1) )
+
     Dold = int(re.search('_D([0-9]*)_', checkpoint_path).group(1))
 
-
     d, D = args.d, args.D
-    dtype, device = model.A.dtype, model.A.device
-
+    dtype, device = model.A1.dtype, model.A1.device
+    
     if (Dold != D):
-        B = torch.rand( d, Dold, Dold, Dold, Dold, dtype=dtype, device=device)
-        model.A = torch.nn.Parameter(B)
+            B = torch.rand( d, Dold, Dold, Dold, dtype=dtype, device=device)
+            model.A1 = torch.nn.Parameter(B)
 
     state = torch.load(checkpoint_path, map_location=lambda storage, loc: storage)
     model.load_state_dict(state['state_dict'])
 
     if (Dold != D):
-        Aold = model.A.data
-        B = 1E-2*torch.rand( d, D, D, D, D, dtype=dtype, device=device)
-        B[:, :Dold, :Dold, :Dold, :Dold] = Aold.reshape(d, Dold, Dold, Dold, Dold)
-        model.A = torch.nn.Parameter(B)
+        Aold = model.A1.data
+        B = 1E-2*torch.rand( d, D, D, D, dtype=dtype, device=device)
+        B[:, :Dold, :Dold, :Dold] = Aold.reshape(d, Dold, Dold, Dold)
+        model.A1 = torch.nn.Parameter(B)
 
 
