@@ -28,6 +28,7 @@ def save_checkpoint(checkpoint_path, model, optimizer):
              'optimizer' : optimizer.state_dict()}
     #print(model.state_dict().keys())
     torch.save(state, checkpoint_path)
+
     #print('model saved to %s' % checkpoint_path)
 
 
@@ -35,6 +36,7 @@ def load_checkpoint(checkpoint_path, args, model):
     print( 'load old model from %s ' % checkpoint_path )
     print( 'Dold = ', re.search('_D([0-9]*)_', checkpoint_path).group(1) )
     Dold = int(re.search('_D([0-9]*)_', checkpoint_path).group(1))
+
 
     d, D = args.d, args.D
     dtype, device = model.A.dtype, model.A.device

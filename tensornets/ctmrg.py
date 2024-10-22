@@ -35,31 +35,33 @@ def renormalize_honeycomb(*tensors):
     dimT = T.shape[0]
     D_new = min(dimEb1*dimT, chi)  # to modify
 
-    Rho = torch.tensordot(C, Ea, ([1],[0]))   # C(ef)*Ea(fga)=Rho(ega)
-    Rho = torch.tensordot(Eb, Rho, ([2],[0])) # Eb(ije)*Rgo(ega)=Rho(ijga)
+    CE = torch.tensordot(C, Ea, ([1],[0]))   # C(ef)*Ea(fga)=Rho(ega)
+    CEE = torch.tensordot(Eb, CE, ([2],[0])) # Eb(ije)*Rgo(ega)=Rho(ijga)
     TaTb = torch.tensordot(T, T, ([2],[0])) # Ta(jkl)*Tb(lpg) = Tab(jkpg)
 
-    # print((T-T.permute(2,1,0)).norm()) 
-    # print((T-T.permute(1,2,0)).norm()) 
+    CEETT = torch.tensordot(CEE,TaTb, ([1,2],[0,3])) # Rho(ijga)*Tab(jkpg) = Rho(i,a,k,p)
+    CEETT = CEETT.permute(0,2,1,3).contiguous().view(dimEb1*dimT, dimEa3*dimT)  # Rho(i,a,k,p) => Rho(i,k,a,p) => Rho(ki, pa)
+    CEETT = CEETT/CEETT.norm()
 
-    Rho = torch.tensordot(Rho,TaTb, ([1,2],[0,3])) # Rho(ijga)*Tab(jkpg) = Rho(i,a,k,p)
-    Rho = Rho.permute(0,2,1,3).contiguous().view(dimEb1*dimT, dimEa3*dimT)  # Rho(i,a,k,p) => Rho(i,k,a,p) => Rho(ki, pa)
-    Rho = Rho/Rho.norm()
-
-    # print((Rho - Rho.t()).norm()) # 
     # step 2: Get Isometry P 
-    U, S, V = svd(Rho@Rho@Rho) 
-    # U, S, V = svd(Rho) 
+    # print((Rho.norm()))
+    # print(C.norm())
+    # print(T.norm())
+    # print(Ea.norm())
+    # print(Eb.norm())
 
-    # Rho is not symmetric, although it should!    
-    # print(Rho)
-    # x[3] = 0
+    U0, S0, V0 = svd(CEETT@CEETT@CEETT) 
+    U, S, V = svd(CEETT) 
+
+    # print((CEETT - torch.conj(CEETT).t()).norm())
+    # print((S - S0).norm())
 
     truncation_error = S[D_new:].sum()/S.sum() 
     P = U[:, :D_new] # projection operator  P(ki, D_new)
 
-    # step 3: renormalize C and E
-    C = (P.t() @ Rho @ P) #C(D_new, D_new)
+    # print('imaginary part of U ', torch.conj(P).norm())
+    C = (torch.conj(P).t() @ CEETT @ P) #C(D_new, D_new)
+
 
     # i--Ea -k- |
     #    | j     P - q   = Eb(ilq)
@@ -70,14 +72,18 @@ def renormalize_honeycomb(*tensors):
     # q - P   |j         = Ea(qmk)
     #   | -l- Ta 
     #           \ m
+    # A = P@torch.conj(P).t()
+    A = torch.conj(P).t()@P # \simeq id
+    N = A.size()[0]
+    id = torch.zeros((N,N))
+    for i in range(N):
+        id[i,i] = 1
 
-    # print('size P')
-    # print(P.size())
-
+    # print('PP^T: ',(A - id).norm())
     
     P = P.view(dimEb1, dimT, D_new)                # P(i,k,D_new)
     Ebtmp = torch.tensordot(Ea,T,([1],[2]))       # Ea(ijk) Tb(lmj) = Ebtmp(iklm) 
-    Ebtmp = torch.tensordot(Ebtmp,P,([1,3],[0,1])) # Ebtmp(iklm) P(kmq) = Ebtmp(ilq) 
+    Ebtmp = torch.tensordot(Ebtmp,torch.conj(P),([1,3],[0,1])) # Ebtmp(iklm) P(kmq) = Ebtmp(ilq) 
 
     Eatmp = torch.tensordot(Eb,T, ([1],[2]))      # Eb(ijk)*Ta(lmj) = Eatmp(iklm)
     Eatmp = torch.tensordot(Eatmp,P, ([0,2],[0,1]))  # Eatmp(iklm)*P(ilq) = Eatmp(kmq)
@@ -87,35 +93,29 @@ def renormalize_honeycomb(*tensors):
     # Eatmp(kmq) => qmk
     Ea = Eatmp.permute(2,1,0)
 
-    return C/C.norm(), Ea/Ea.norm(), Eb/Eb.norm(), S.abs()/S.abs().max(), truncation_error
+  
+    return C/C.norm(), Ea/Ea.norm(), Eb/Eb.norm(), S/S.max(), truncation_error
 
 
 ## For the ruby lattice, I could ask for the state to be C3-symmetric. 
 ## Ea, Eb, C // Ta and Tb are the local tensors
-def CTMRG_honeycomb(T, chi, max_iter, use_checkpoint=False):
-    # T(up, left, down, right)
+def CTMRG_honeycomb(T, chi, max_iter, dtype, use_checkpoint=False):
 
-    threshold = 1E-12 if T.dtype is torch.float64 else 1E-6 # ctmrg convergence threshold
+    threshold = 1E-7 #if T.dtype is torch.float64 else 1E-6 # ctmrg convergence threshold
 
     ## Declaration of C, Ea, Eb => C3-symmetric state
-    # C(down, right), E(up,right,down)
-    # C = Ta.sum(1)  
-    # Ea = Ta #.sum(1).permute(0,2,1)
-    # Eb = Tb #.sum(1).permute(0,2,1)
+    # C(down, right), E(up,right,down
 
-
-    C = torch.ones((1,1), dtype=torch.float64)
-    Ea = torch.ones((1,1,1),dtype=torch.float64)
-    Eb = torch.ones((1,1,1),dtype=torch.float64)
+    C = torch.ones((1,1), dtype=dtype)
+    Ea = torch.ones((1,1,1),dtype=dtype)
+    Eb = torch.ones((1,1,1),dtype=dtype)
 
     truncation_error = 0.0
     sold = torch.zeros(chi, dtype=T.dtype, device=T.device)
     diff = 1E1
     for n in range(max_iter):
-        # tensors = C, Ea, Eb, Ta, Tb, torch.tensor(chi)  ## gives a tuple
-        tensors = C, Ea, Eb, T, torch.tensor(chi)  ## gives a tuple
 
-        # print((T-T.permute(0,2,1)).norm())
+        tensors = C, Ea, Eb, T, torch.tensor(chi)  ## gives a tuple
 
         if use_checkpoint: # use checkpoint to save memory
             C, Ea, Eb, s, error = checkpoint(renormalize_honeycomb, *tensors) 
@@ -129,8 +129,9 @@ def CTMRG_honeycomb(T, chi, max_iter, use_checkpoint=False):
         truncation_error += error.item()
         if (s.numel() == sold.numel()):
             diff = (s-sold).norm().item()
+            # print(n,'  :  ',diff)
             #print( s, sold )
-            #print( 'n: %d, Enorm: %g, error: %e, diff: %e' % (n, Enorm, error.item(), diff) )
+            # print( 'n: %d, Enorm: %g, error: %e, diff: %e' % (n, Enorm, error.item(), diff) )
         if (diff < threshold):
             break
         sold = s
