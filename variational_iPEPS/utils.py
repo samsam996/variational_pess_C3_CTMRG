@@ -49,16 +49,21 @@ def load_checkpoint(checkpoint_path, args, model):
     dtype, device = model.A1.dtype, model.A1.device
     
     if (Dold != D):
-            B = torch.rand( d, Dold, Dold, Dold, dtype=dtype, device=device)
-            model.A1 = torch.nn.Parameter(B)
+            B1 = torch.rand( d, Dold, Dold, Dold, dtype=dtype, device=device)
+            model.A1 = torch.nn.Parameter(B1)
+            B2 = torch.rand( d, Dold, Dold, Dold, dtype=dtype, device=device)
+            model.A2 = torch.nn.Parameter(B2)
 
     state = torch.load(checkpoint_path, map_location=lambda storage, loc: storage)
     model.load_state_dict(state['state_dict'])
 
     if (Dold != D):
         Aold = model.A1.data
-        B = 1E-2*torch.rand( d, D, D, D, dtype=dtype, device=device)
-        B[:, :Dold, :Dold, :Dold] = Aold.reshape(d, Dold, Dold, Dold)
-        model.A1 = torch.nn.Parameter(B)
+        B1 = 1E-2*torch.rand( d, D, D, D, dtype=dtype, device=device)
+        B1[:, :Dold, :Dold, :Dold] = Aold.reshape(d, Dold, Dold, Dold)
+        model.A1 = torch.nn.Parameter(B1)
+        B2 = 1E-2*torch.rand( d, D, D, D, dtype=dtype, device=device)
+        B2[:, :Dold, :Dold, :Dold] = Aold.reshape(d, Dold, Dold, Dold)
+        model.A2 = torch.nn.Parameter(B2)
 
 
