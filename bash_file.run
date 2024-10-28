@@ -27,16 +27,12 @@ module load gcc/9.3.0 python/3.8.5 cuda/11.0
 
 echo STARTING AT `date`
 
-# Activate your environment if needed
-source activate my_env
-
-
 # Define environment name and Python version
 ENV_NAME="veripeps"
 PYTHON_VERSION="3.8"
 
 # Create environment
-conda create -n $ENV_NAME python=$PYTHON_VERSION -y
+#conda create -n $ENV_NAME python=$PYTHON_VERSION -y
 
 # Activate the environment
 source activate $ENV_NAME
@@ -46,7 +42,7 @@ pip install -r variational_iPEPS/requirements.txt
 
 # Run your script
 cd variational_iPEPS
-python main.py -D=2 -chi=15 -dtype="float64" -Nepochs=10 -device=0
+python main.py -D=2 -chi=15 -dtype="float64" -Nepochs=10 -cuda=0
 
 conda deactivate
 

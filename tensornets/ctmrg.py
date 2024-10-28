@@ -40,21 +40,21 @@ def renormalize_honeycomb(*tensors):
     # U, S, V = svd(CEETT@CEETT@CEETT) 
     U, S, V = svd(CEETT) 
     
-    U0, S0, V0 = svd(CEETT@CEETT) 
-    V0 = V0.t()
-    # print('norm A - USV 2:', ( U0@torch.diag(S0)@V0 - CEETT@CEETT).norm() )
-    truncation_error = S0[D_new:].sum()/S.sum()
+    # U0, S0, V0 = svd(CEETT@CEETT) 
+    # V0 = V0.t()
+    # # print('norm A - USV 2:', ( U0@torch.diag(S0)@V0 - CEETT@CEETT).norm() )
+    truncation_error = S[D_new:].sum()/S.sum()
 
-    U0 = U0[:, :D_new]
-    V0 = V0[:D_new, :]
-    S0 = S0[:D_new]
+    # U0 = U0[:, :D_new]
+    # V0 = V0[:D_new, :]
+    # S0 = S0[:D_new]
 
-    inv_sqrt_s = torch.zeros((D_new,D_new), dtype=CEETT.dtype)
-    for i in range(D_new):
-        inv_sqrt_s[i,i] = 1/torch.sqrt(S0[i])
+    # inv_sqrt_s = torch.zeros((D_new,D_new), dtype=CEETT.dtype, device=C.device)
+    # for i in range(D_new):
+    #     inv_sqrt_s[i,i] = 1/torch.sqrt(S0[i])
 
-    P1bar = inv_sqrt_s@torch.conj(U0).t()@CEETT # chi_new dchi
-    P1 = CEETT@V0.t()@inv_sqrt_s # dchi chi_new
+    # P1bar = inv_sqrt_s@torch.conj(U0).t()@CEETT # chi_new dchi
+    # P1 = CEETT@V0.t()@inv_sqrt_s # dchi chi_new
 
     '''
     print('USV^T: ',(U0@torch.diag(S0)@V0.t()-A).norm()) # 1e-8 with USV = svd(A)
@@ -68,17 +68,17 @@ def renormalize_honeycomb(*tensors):
     # print('imaginary part of U ', torch.conj(P).norm())
 
     # C = (torch.conj(P).t() @ CEETT @ P) #C(D_new, D_new)
-    N = (P1@P1bar).size()[0]
-    id1 = torch.zeros(N,N)
-    M = (P1bar@P1).size()[0]
-    id2 = torch.zeros(M,M)
+    # N = (P1@P1bar).size()[0]
+    # id1 = torch.zeros(N,N)
+    # M = (P1bar@P1).size()[0]
+    # id2 = torch.zeros(M,M)
 
-    for i in range(N):
-        id1[i,i] = 1
-    for i in range(M):
-        id2[i,i] = 1
-    # print('PPbar - id ',(P1@P1bar - id1).norm())
-    # print('PbarP - id ',(P1bar@P1 - id2).norm()) = 0
+    # for i in range(N):
+    #     id1[i,i] = 1
+    # for i in range(M):
+    #     id2[i,i] = 1
+    # # print('PPbar - id ',(P1@P1bar - id1).norm())
+    # # print('PbarP - id ',(P1bar@P1 - id2).norm()) = 0
 
 
     C = P.t()@CEETT@P
@@ -103,9 +103,9 @@ def renormalize_honeycomb(*tensors):
       P1bar chi_new dchi
       P1    dchi chi_new
     '''
-    P1bar = P1bar.reshape(D_new, dimT, dimEb1)  # chi_new d chi
-    P1bar = P1bar.permute((2,1,0))              # chi d chi_new
-    P1 = P1.reshape(dimEb1,dimT,D_new)          # chi d chi_new
+    # P1bar = P1bar.reshape(D_new, dimT, dimEb1)  # chi_new d chi
+    # P1bar = P1bar.permute((2,1,0))              # chi d chi_new
+    # P1 = P1.reshape(dimEb1,dimT,D_new)          # chi d chi_new
 
     Ebtmp = torch.einsum('ijk,lmj,kmq->ilq',(Ea,Tb,torch.conj(P)))
     Eatmp = torch.einsum('ijk,lmj,ilq->qmk',(Eb,Ta,P))
@@ -131,9 +131,9 @@ def CTMRG_honeycomb(Ta, Tb, H, M, A1symm, A2symm, chi, max_iter, dtype, use_chec
     ## Declaration of C, Ea, Eb => C3-symmetric state
     # C(down, right), E(up,right,down
 
-    C = torch.ones((1,1), dtype=dtype)
-    Ea = torch.ones((1,1,1),dtype=dtype)
-    Eb = torch.ones((1,1,1),dtype=dtype)
+    C = torch.ones((1,1), dtype=dtype, device= Ta.device)
+    Ea = torch.ones((1,1,1),dtype=dtype, device= Ta.device)
+    Eb = torch.ones((1,1,1),dtype=dtype, device= Ta.device)
 
     diff = 1E1
     ener = 0
