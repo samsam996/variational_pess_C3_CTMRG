@@ -36,38 +36,44 @@ class honeycombiPEPS(torch.nn.Module):
         #          self.A1.permute(0,2,3,1) + self.A1.permute(0,3,2,1) + \
         #          self.A1.permute(0,3,1,2) + self.A1.permute(0,2,1,3) 
         
-        # We make (in this particular case for the C3v CTMRG) the local tensor C3v symmetric
-        A1symm = self.A1.reshape(2,2,2,D,D,D)
-        A1symm = A1symm.permute(0,1,2, 3,4,5) +  A1symm.permute(1,2,0 , 4,5,3) +  A1symm.permute(2,0,1, 5,3,4) 
-        A1symm = A1symm.reshape(8, D,D,D)
+        if d == 8:
+            A1symm = self.A1.reshape(2,2,2,D,D,D)
+            A1symm = A1symm.permute(0,1,2, 3,4,5) +  A1symm.permute(1,2,0 , 4,5,3) +  A1symm.permute(2,0,1, 5,3,4) 
+            A1symm = A1symm.reshape(8, D,D,D)
 
-        A2symm = self.A2.reshape(2,2,2,D,D,D)
-        A2symm = A2symm.permute(0,1,2, 3,4,5) +  A2symm.permute(1,2,0 , 4,5,3) +  A2symm.permute(2,0,1, 5,3,4) 
-        A2symm = A2symm.reshape(8, D,D,D)
+            A2symm = self.A2.reshape(2,2,2,D,D,D)
+            A2symm = A2symm.permute(0,1,2, 3,4,5) +  A2symm.permute(1,2,0 , 4,5,3) +  A2symm.permute(2,0,1, 5,3,4) 
+            A2symm = A2symm.reshape(8, D,D,D)
 
-        # A1symm = A1symm.permute(0,1,2,3) +  A1symm.permute(0,2,3,1) + A1symm.permute(0,3,1,2) 
-   
-        Ta = torch.tensordot(A1symm,torch.conj(A1symm),([0],[0])) # T(d 123) T(d 345) = T(123456)
-        Ta = Ta.permute(0,3,1,4,2,5)
-        Ta = Ta.contiguous().view(D*D,D*D,D*D)
+        else:
+            A1symm = self.A1.permute(0,1,2,3) +  self.A1.permute(0,2,3,1) + self.A1.permute(0,3,1,2) 
+            A2symm = self.A2.permute(0,1,2,3) +  self.A2.permute(0,2,3,1) + self.A2.permute(0,3,1,2) 
 
-        Tb = torch.tensordot(A2symm,torch.conj(A2symm),([0],[0])) # T(d 123) T(d 345) = T(123456)
-        Tb = Tb.permute(0,3,1,4,2,5)
-        Tb = Tb.contiguous().view(D*D,D*D,D*D)
+            A1symm = A1symm/A1symm.norm()
+            A2symm = A2symm/A2symm.norm()
+            # A2symm = A1symm
+            
+        Ta = torch.einsum('mefg,mabc->eafbgc',(A1symm,torch.conj(A1symm))).reshape(D**2, D**2, D**2)
+        Tb = torch.einsum('mefg,mabc->eafbgc',(A2symm,torch.conj(A2symm))).reshape(D**2, D**2, D**2)
 
-        Ta = Ta/Tb.norm()
-        Tb = Ta/Tb.norm()
+        # Ta = Ta/Ta.norm()
+        # Tb = Tb/Tb.norm()
 
-        C, Ea, Eb = CTMRG_honeycomb(Ta, Tb, chi, Niter, dtype, self.use_checkpoint) 
+
+        M = [Mpx, Mpy, Mpz]
+        C, Ea, Eb = CTMRG_honeycomb(Ta, Tb, H, M, A1symm, A2symm, chi, Niter, dtype, self.use_checkpoint) 
 
         loss = 0
         ener_array = []
         for i in range(len(H)):
             ener, Mx, My, Mz = get_obs_honeycomb(A1symm, A2symm, H[i], Mpx, Mpy, Mpz, C, Ea, Eb)
             ener_array.append(ener)
+            print('ener :',ener)
             # print(ener)
 
-        # loss = torch.real(ener_array[2]) 
-        loss = torch.real(sum(ener_array))
+        # loss = torch.real(ener_array[0]*3) 
+        # print(ener_array)
+        # print(sum(ener_array))
+        loss = torch.real(sum(ener_array)/len(ener_array))
 
         return loss, Mx, My, Mz 

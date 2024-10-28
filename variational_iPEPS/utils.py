@@ -59,11 +59,12 @@ def load_checkpoint(checkpoint_path, args, model):
 
     if (Dold != D):
         Aold = model.A1.data
+        Bold = model.A2.data
         B1 = 1E-2*torch.rand( d, D, D, D, dtype=dtype, device=device)
         B1[:, :Dold, :Dold, :Dold] = Aold.reshape(d, Dold, Dold, Dold)
         model.A1 = torch.nn.Parameter(B1)
         B2 = 1E-2*torch.rand( d, D, D, D, dtype=dtype, device=device)
-        B2[:, :Dold, :Dold, :Dold] = Aold.reshape(d, Dold, Dold, Dold)
+        B2[:, :Dold, :Dold, :Dold] = Bold.reshape(d, Dold, Dold, Dold)
         model.A2 = torch.nn.Parameter(B2)
 
 

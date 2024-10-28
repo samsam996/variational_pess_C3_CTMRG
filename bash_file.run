@@ -1,0 +1,59 @@
+#!/bin/bash
+#SBATCH --job-name=my_gpu_job       # Job name
+#SBATCH --partition=gpu             # Partition (queue) to submit to
+#SBATCH --gres=gpu:1                # Request one GPU
+#SBATCH --ntasks=1                  # Run on a single CPU
+#SBATCH --cpus-per-task=1           # Number of CPU cores per task
+#SBATCH --mem=16G                   # Job memory request
+#SBATCH --time=01:00:00             # Time limit (1 hour)
+#SBATCH --output=output_%j.log      # Standard output and error log
+
+
+export SCR=/scratch/snyckees/
+export DAT=/home/snyckees/variational_iPEPS
+export RES=/home/snyckees/RESULTS/$SLURM_JOB_ID/
+
+echo "***** START OF JOB ***** "
+
+cd $SCR
+mkdir $SLURM_JOB_ID
+cd ./$SLURM_JOB_ID
+
+cp -a $DAT/. .
+
+module purge
+# Load necessary modules (example with Python and CUDA)
+module load gcc/9.3.0 python/3.8.5 cuda/11.0
+
+echo STARTING AT `date`
+
+# Activate your environment if needed
+source activate my_env
+
+
+# Define environment name and Python version
+ENV_NAME="veripeps"
+PYTHON_VERSION="3.8"
+
+# Create environment
+conda create -n $ENV_NAME python=$PYTHON_VERSION -y
+
+# Activate the environment
+source activate $ENV_NAME
+
+# Install packages
+pip install -r variational_iPEPS/requirements.txt
+
+# Run your script
+cd variational_iPEPS
+python main.py -D=2 -chi=15 -dtype="float64" -Nepochs=10 -device=0
+
+conda deactivate
+
+echo FINISHED at `date`
+
+mkdir -p $RES
+cp -r $SCR/$SLURM_JOB_ID/data $RES
+
+echo " ***** END OF JOB ***** "
+
