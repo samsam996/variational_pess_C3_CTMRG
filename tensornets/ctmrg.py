@@ -9,7 +9,7 @@ svd = SVD.apply
 #symeig = EigenSolver.apply
 
 def renormalize_honeycomb(*tensors):
-    # T(up,left,down,right), u=up, l=left, d=down, r=right
+
     # C(d,r), EL(u,r,d), EU(l,d,r)
 
     C, Ea, Eb, Ta, Tb, chi = tensors 
@@ -31,7 +31,7 @@ def renormalize_honeycomb(*tensors):
 
     # dimT, dimE = Ta.shape[0], Ea.shape[0] # to modify
     dimT = Ta.shape[0]
-    D_new = min(dimEb1*dimT, chi)  # to modify
+    D_new = min(dimEb1*dimT, chi) 
 
     CEETT = torch.einsum('ije,ef,fga,jkl,lpg->ikap',(Eb,C,Ea,Ta,Tb))
     CEETT = CEETT.reshape(dimEb1*dimT, dimEa3*dimT)  # Rho(i,a,k,p) => Rho(i,k,a,p) => Rho(ki, pa)
@@ -110,8 +110,8 @@ def renormalize_honeycomb(*tensors):
     Ebtmp = torch.einsum('ijk,lmj,kmq->ilq',(Ea,Tb,torch.conj(P)))
     Eatmp = torch.einsum('ijk,lmj,ilq->qmk',(Eb,Ta,P))
 
-    # Ebtmp = torch.einsum('ijk,lmj,kmq->ilq',(Ea,Tb,P1))
-    # Eatmp = torch.einsum('ijk,lmj,ilq->qmk',(Eb,Ta,P1bar))
+    # Ebtmp = torch.einsum('ijk,lmj,kmq->ilq',(Ea,Tb,P1)) 
+    # Eatmp = torch.einsum('ijk,lmj,ilq->qmk',(Eb,Ta,P1bar)) 
 
     Eb = Ebtmp.clone()
     Ea = Eatmp.clone()
@@ -128,27 +128,25 @@ def CTMRG_honeycomb(Ta, Tb, H, M, A1symm, A2symm, chi, max_iter, dtype, use_chec
 
     threshold = 1E-12 
 
-    ## Declaration of C, Ea, Eb => C3-symmetric state
-    # C(down, right), E(up,right,down
-
     C = torch.ones((1,1), dtype=dtype, device= Ta.device)
     Ea = torch.ones((1,1,1),dtype=dtype, device= Ta.device)
     Eb = torch.ones((1,1,1),dtype=dtype, device= Ta.device)
+  
 
     diff = 1E1
     ener = 0
+    ener1 = 0
 
     for n in range(max_iter):
 
-        tensors = C, Ea, Eb, Ta, Tb, torch.tensor(chi) ## gives a tuple
-
+        tensors = C, Ea, Eb, Ta, Tb, torch.tensor(chi)
         Etmp = ener
-        ener, Mx, My, Mz = get_obs_honeycomb(A1symm, A2symm, H[0], M[0], M[1], M[2], C, Ea, Eb)
+        ener, ener2, Mx, My, Mz = get_obs_honeycomb(A1symm, A2symm, H[0], M[0], M[1], M[2], C, Ea, Eb)
         # print('n', n, ' ', ener - Etmp)
         diff = abs(ener - Etmp)
 
         if use_checkpoint: # use checkpoint to save memory 
-             C, Ea, Eb, s, error = checkpoint(renormalize_honeycomb, *tensors) 
+            C, Ea, Eb, s, error = checkpoint(renormalize_honeycomb, *tensors) 
         else:
             C, Ea, Eb, s, error = renormalize_honeycomb(*tensors)
 
