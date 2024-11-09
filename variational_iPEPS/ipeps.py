@@ -21,11 +21,11 @@ class honeycombiPEPS(torch.nn.Module):
         
         B1 = torch.abs(torch.rand(d, D, D, D, dtype=dtype, device=device))
         B1 = B1/B1.norm()
-        B2 = torch.abs(torch.rand(d, D, D, D, dtype=dtype, device=device))
-        B2 = B2/B2.norm()
+        # B2 = torch.abs(torch.rand(d, D, D, D, dtype=dtype, device=device))
+        # B2 = B2/B2.norm()
 
         self.A1 = torch.nn.Parameter(B1)
-        self.A2 = torch.nn.Parameter(B2)
+        # self.A2 = torch.nn.Parameter(B2)
         
     def forward(self, H, Mpx, Mpy, Mpz, chi, dtype):
         
@@ -49,9 +49,10 @@ class honeycombiPEPS(torch.nn.Module):
             # A2symm = A2symm.reshape(8, D,D,D)
         elif d==4:
             A1symm = self.A1
-            A2symm = self.A2
+            # A2symm = self.A2
             A1symm = A1symm.permute(0, 1,2,3) +  A1symm.permute(0 , 2,3,1) +  A1symm.permute(0, 3,1,2) 
-            A2symm = A2symm.permute(0, 1,2,3) +  A2symm.permute(0 , 2,3,1) +  A2symm.permute(0, 3,1,2) 
+            # A2symm = A2symm.permute(0, 1,2,3) +  A2symm.permute(0 , 2,3,1) +  A2symm.permute(0, 3,1,2) 
+            A2symm = A1symm
 
 
 
