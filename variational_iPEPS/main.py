@@ -45,9 +45,7 @@ if __name__=='__main__':
         except FileNotFoundError:
             print('not found:', args.load)
 
-    # optimizer = torch.optim.LBFGS(model.parameters(), max_iter=10)
     optimizer =  torch.optim.Adam(model.parameters(), lr=1e-3)
-    # optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-3, alpha=0.99, eps=1e-08)
 
     params = list(model.parameters())
     params = list(filter(lambda p: p.requires_grad, params))
@@ -64,8 +62,13 @@ if __name__=='__main__':
         key += '_float64'
     if args.dtype=="cfloat": #(args.float32):
         key += '_cfloat'    
+
+    if args.model=='maple_leaf':
+        key += f'_Jd{args.Jd:.2f}_Jt{args.Jt:.2f}'
+
     cmd = ['mkdir', '-p', key]
     subprocess.check_call(cmd)
+
 
     if args.model == 'Heisenberg':
         # Hamiltonian operators on a bond
@@ -79,8 +82,8 @@ if __name__=='__main__':
 
         # now assuming Jz>0, Jxy > 0
         # We flip the spin on one of the sub-lattice to get back to a one-site unit cell in the iPEPS wavefunction.
-        h = 2*kron(sz,sz)+(kron(sm, sp)+kron(sp,sm))
-        # h = 2*kron(sz,4*sx@sz@sx)-(kron(sm, 4*sx@sp@sx)+kron(sp,4*sx@sm@sx))
+        # h = 2*kron(sz,sz)+(kron(sm, sp)+kron(sp,sm))
+        h = 2*kron(sz,4*sx@sz@sx)-(kron(sm, 4*sx@sp@sx)+kron(sp,4*sx@sm@sx))
 
         H =[h/2]
         
@@ -89,11 +92,8 @@ if __name__=='__main__':
         Mpy = kron(sp, id2)
         Mpz = kron(sm, id2)
 
-
     elif args.model == 'maple_leaf':
             
-
-
             # For now we assume to be in the Neel phase
             sx = torch.tensor([[0, 1], [1, 0]], dtype=dtype, device=device)*0.5
             sy = torch.tensor([[0, -1], [1, 0]], dtype=dtype, device=device)*0.5
@@ -218,32 +218,32 @@ if __name__=='__main__':
             H2 = Hy(id2,id2,id2,Ry(np.pi),Ry(np.pi),Ry(np.pi)) 
             H3 = Hx(id2,id2,id2,Ry(np.pi),Ry(np.pi),Ry(np.pi)) 
 
-            H = [H2]
+            H = [H1/6]
             # H2 = Hy(id2,id2,id2,Rypi,Rypi,Rypi)
             # H1 = Hx(id2,id2,id2,Rypi,Rypi,Rypi)
             # H = [H3]
 
             # Ruby lattice (120-canted order)
-            pi = np.pi
-            # H1 = Hz(Ry(-1/6*pi), Ry(-3/2*pi), Ry(-5/6*pi),Ry(-0/1*pi),Ry(-2/3*pi), Ry(-4/3*pi))
-            # H2 = Hz(Ry(-3/2*pi), Ry(-5/6*pi), Ry(-1/6*pi),Ry(-4/3*pi),Ry(-0/1*pi), Ry(-2/3*pi))
-            # H3 = Hz(Ry(-5/6*pi), Ry(-1/6*pi), Ry(-3/2*pi),Ry(-2/3*pi),Ry(-4/3*pi), Ry(-0/1*pi))
+            # pi = np.pi
+            # # H1 = Hz(Ry(-1/6*pi), Ry(-3/2*pi), Ry(-5/6*pi),Ry(-0/1*pi),Ry(-2/3*pi), Ry(-4/3*pi))
+            # # H2 = Hz(Ry(-3/2*pi), Ry(-5/6*pi), Ry(-1/6*pi),Ry(-4/3*pi),Ry(-0/1*pi), Ry(-2/3*pi))
+            # # H3 = Hz(Ry(-5/6*pi), Ry(-1/6*pi), Ry(-3/2*pi),Ry(-2/3*pi),Ry(-4/3*pi), Ry(-0/1*pi))
             
-            H1 = Hz(Ry(-0/1*pi), Ry(-2/3*pi), Ry(-4/3*pi),Ry(-1/6*pi),Ry(-3/2*pi), Ry(-5/6*pi))
-            H2 = Hz(Ry(-4/3*pi), Ry(-0/6*pi), Ry(-2/3*pi),Ry(-3/2*pi),Ry(-5/6*pi), Ry(-1/6*pi))
-            H3 = Hz(Ry(-2/3*pi), Ry(-4/3*pi), Ry(-0/2*pi),Ry(-5/6*pi),Ry(-1/6*pi), Ry(-3/2*pi))
+            # H1 = Hz(Ry(-0/1*pi), Ry(-2/3*pi), Ry(-4/3*pi),Ry(-1/6*pi),Ry(-3/2*pi), Ry(-5/6*pi))
+            # H2 = Hz(Ry(-4/3*pi), Ry(-0/6*pi), Ry(-2/3*pi),Ry(-3/2*pi),Ry(-5/6*pi), Ry(-1/6*pi))
+            # H3 = Hz(Ry(-2/3*pi), Ry(-4/3*pi), Ry(-0/2*pi),Ry(-5/6*pi),Ry(-1/6*pi), Ry(-3/2*pi))
             
-            # H4 = Hx(Ry(-5/6*pi),Ry(-1/6*pi),Ry(-3/2*pi),Ry(-0/1*pi),Ry(-2/3*pi),Ry(-4/3*pi))
-            # H5 = Hx(Ry(-1/6*pi),Ry(-3/2*pi),Ry(-5/6*pi),Ry(-4/3*pi),Ry(-0/1*pi),Ry(-2/3*pi))
-            # H6 = Hx(Ry(-3/2*pi),Ry(-5/6*pi),Ry(-1/6*pi),Ry(-2/3*pi),Ry(-4/3*pi),Ry(-0/1*pi))
+            # # H4 = Hx(Ry(-5/6*pi),Ry(-1/6*pi),Ry(-3/2*pi),Ry(-0/1*pi),Ry(-2/3*pi),Ry(-4/3*pi))
+            # # H5 = Hx(Ry(-1/6*pi),Ry(-3/2*pi),Ry(-5/6*pi),Ry(-4/3*pi),Ry(-0/1*pi),Ry(-2/3*pi))
+            # # H6 = Hx(Ry(-3/2*pi),Ry(-5/6*pi),Ry(-1/6*pi),Ry(-2/3*pi),Ry(-4/3*pi),Ry(-0/1*pi))
             
-            # H7 = Hy(Ry(-3/2*pi),Ry(-5/6*pi),Ry(-1/6*pi),Ry(-0/1*pi),Ry(-2/3*pi),Ry(-4/3*pi))
-            # H8 = Hy(Ry(-5/6*pi),Ry(-1/6*pi),Ry(-3/2*pi),Ry(-4/3*pi),Ry(-0/1*pi),Ry(-2/3*pi))
-            # H9 = Hy(Ry(-1/6*pi),Ry(-3/2*pi),Ry(-5/6*pi),Ry(-2/3*pi),Ry(-4/3*pi),Ry(-0/1*pi))
+            # # H7 = Hy(Ry(-3/2*pi),Ry(-5/6*pi),Ry(-1/6*pi),Ry(-0/1*pi),Ry(-2/3*pi),Ry(-4/3*pi))
+            # # H8 = Hy(Ry(-5/6*pi),Ry(-1/6*pi),Ry(-3/2*pi),Ry(-4/3*pi),Ry(-0/1*pi),Ry(-2/3*pi))
+            # # H9 = Hy(Ry(-1/6*pi),Ry(-3/2*pi),Ry(-5/6*pi),Ry(-2/3*pi),Ry(-4/3*pi),Ry(-0/1*pi))
             
-            # H = [H1,H2,H3,H4,H5,H6,H7,H8,H9]
-            # H = [H1,H2,H3]
-            H1 = Hz(id2,id2,id2,id2,id2,id2)
+            # # H = [H1,H2,H3,H4,H5,H6,H7,H8,H9]
+            # # H = [H1,H2,H3]
+            # H1 = Hz(id2,id2,id2,id2,id2,id2)
 
             Mpx = kron(kron(kron(id2,sx),kron(id2,id2)),kron(id2,id2))
             Mpy = kron(kron(kron(id2,sy),kron(id2,id2)),kron(id2,id2))
@@ -258,26 +258,42 @@ if __name__=='__main__':
             sm = torch.tensor([[0, 0], [1, 0]], dtype=dtype, device=device)
             sz = torch.tensor([[1, 0], [0, -1]], dtype=dtype, device=device)*0.5
             id2 = torch.tensor([[1, 0], [0, 1]], dtype=dtype, device=device)
+            
+            def Ry(theta):
+                return np.cos(theta/2)*id2 + np.sin(theta/2)*sy*2
 
-            tx = sx
+
+            theta = np.pi
+
             tp = sp
             tm = sm
-            ty = sy
             tz = sz
+
 
             Mpz = kron(kron(sz,id2),kron(id2,id2))
             Mpx = kron(kron(sp,id2),kron(id2,id2))
             Mpy = kron(kron(sm,id2),kron(id2,id2))
 
-            hy =        kron(kron(sp,id2),kron(sm,id2))/2 
-            hy = hy +   kron(kron(sm,id2),kron(sp,id2))/2 
-            hy = hy +   kron(kron(sz,id2),kron(sz,id2))
-            hy = hy +   kron(kron(id2,tp),kron(id2,tm))/2 
-            hy = hy +   kron(kron(id2,tm),kron(id2,tp))/2
-            hy = hy +   kron(kron(id2,tz),kron(id2,tz))
-            hy = hy + 4*(kron(kron(sp,tp),kron(sm,tm))/4 + kron(kron(sp,tm),kron(sm,tp))/4 + kron(kron(sp,tz),kron(sm,tz))/2)
-            hy = hy + 4*(kron(kron(sm,tp),kron(sp,tm))/4 + kron(kron(sm,tm),kron(sp,tp))/4 + kron(kron(sm,tz),kron(sp,tz))/2)
-            hy = hy + 4*(kron(kron(sz,tp),kron(sz,tm))/2 + kron(kron(sz,tm),kron(sz,tp))/2 + kron(kron(sz,tz),kron(sz,tz)))
+            hy =        kron(kron(sp,id2),kron(Ry(theta)@sm@Ry(theta).t(),id2))/2 
+            hy = hy +   kron(kron(sm,id2),kron(Ry(theta)@sp@Ry(theta).t(),id2))/2 
+            hy = hy +   kron(kron(sz,id2),kron(Ry(theta)@sz@Ry(theta).t(),id2))
+
+            hy = hy +   kron(kron(id2,tp),kron(id2,Ry(theta)@tm@Ry(theta).t()))/2 
+            hy = hy +   kron(kron(id2,tm),kron(id2,Ry(theta)@tp@Ry(theta).t()))/2
+            hy = hy +   kron(kron(id2,tz),kron(id2,Ry(theta)@tz@Ry(theta).t()))
+
+            hy = hy + 4*(kron(kron(sp,tp),kron(Ry(theta)@sm@Ry(theta).t(),Ry(theta)@tm@Ry(theta).t()))/4 + \
+                         kron(kron(sp,tm),kron(Ry(theta)@sm@Ry(theta).t(),Ry(theta)@tp@Ry(theta).t()))/4 + \
+                         kron(kron(sp,tz),kron(Ry(theta)@sm@Ry(theta).t(),Ry(theta)@tz@Ry(theta).t()))/2)
+            
+            hy = hy + 4*(kron(kron(sm,tp),kron(Ry(theta)@sp@Ry(theta).t(),Ry(theta)@tm@Ry(theta).t()))/4 + \
+                         kron(kron(sm,tm),kron(Ry(theta)@sp@Ry(theta).t(),Ry(theta)@tp@Ry(theta).t()))/4 + \
+                         kron(kron(sm,tz),kron(Ry(theta)@sp@Ry(theta).t(),Ry(theta)@sz@Ry(theta).t()))/2)
+            
+            hy = hy + 4*(kron(kron(sz,tp),kron(Ry(theta)@sz@Ry(theta).t(),Ry(theta)@tm@Ry(theta).t()))/2 + \
+                         kron(kron(sz,tm),kron(Ry(theta)@sz@Ry(theta).t(),Ry(theta)@tp@Ry(theta).t()))/2 + \
+                         kron(kron(sz,tz),kron(Ry(theta)@sz@Ry(theta).t(),Ry(theta)@tz@Ry(theta).t())))
+
             hy = hy + 1/4*kron(kron(id2,id2),kron(id2,id2))
 
             H = [hy]
@@ -305,22 +321,6 @@ if __name__=='__main__':
         # Return loss for monitoring
         return loss.item(), Mx, My, Mz
 
-    # for the LGBS optimiser
-    def closure():
-        # Zero the gradients from the previous step
-        optimizer.zero_grad()
-        # Start the timer for performance measurement
-        start = time.time()
-        # Perform a forward pass through the model
-        loss, Mx, My, Mz = model.forward(H, Mpx, Mpy, Mpz, args.chi, dtype)
-        # Record the time taken for the forward pass
-        forward = time.time()
-        # Perform backpropagation to compute gradients
-        loss.backward()
-        #print (model.A.norm().item(), model.A.grad.norm().item(), loss.item(), Mx.item(), My.item(), Mz.item(), torch.sqrt(Mx**2+My**2+Mz**2).item(), forward-start, time.time()-forward)
-        return loss
-
-
     with io.open(key + '.log', 'a', buffering=1, newline='\n') as logfile:
 
         En = 4
@@ -331,8 +331,6 @@ if __name__=='__main__':
 
             # Train step and get loss and magnetization values
             loss, Mx, My, Mz = train_step(H, Mpx, Mpy, Mpz, args, dtype)
-
-            # loss = optimizer.step(closure)
            
             # Save checkpoint periodically
             if (epoch % args.save_period == 0):

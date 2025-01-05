@@ -42,7 +42,15 @@ pip install -r variational_iPEPS/requirements.txt
 
 # Run your script
 cd variational_iPEPS
-python main.py -D=2 -chi=15 -dtype="float64" -Nepochs=10 -cuda=0
+
+
+
+D="2"
+Jt="0.12"
+Jd="0.1"
+chi="15"
+
+python main.py -D=${D} -chi=${chi} -dtype="float64" -Nepochs=10 -Jt=${Jt} -Jd=${Jd} -cuda=0
 
 conda deactivate
 
@@ -51,5 +59,9 @@ echo FINISHED at `date`
 mkdir -p $RES
 cp -r $SCR/$SLURM_JOB_ID/data $RES
 
+cp -r $SCR/$SLURM_JOB_ID/data/maple_leaf_D${D}_chi${chi}_float64_Jd${Jd}.0_Jt${Jt} $DAT/data
+
+
+maple_leaf_D2_chi10_float64_Jd1.0_Jt0.12
 echo " ***** END OF JOB ***** "
 

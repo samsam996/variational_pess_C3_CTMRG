@@ -32,8 +32,6 @@ def save_checkpoint(checkpoint_path, model, optimizer):
     state = {'state_dict': model.state_dict(),
              'optimizer' : optimizer.state_dict()}
     
-    #print(model.state_dict().keys())
-    # Save the state dictionary to a file
     torch.save(state, checkpoint_path)
 
     #print('model saved to %s' % checkpoint_path)
