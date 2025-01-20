@@ -49,21 +49,20 @@ def RhoAB(A1symm, A2symm,  C, Ea, Eb):
     #    Eb-j-Ta 
     #    |    |
     #    i    k
-        
+    # 
+    # Ta : jlk and Tb : lgp    
+
     ### COMPUTING ENER 1
 
-    CEETT = torch.einsum('ije,ef,fga,jkl,lpg->ikap',(Eb,C,Ea,Ta,Tb))
-    CEETdTd = torch.einsum('ije,ef,fga,jklsu,lpgtv->ikapstuv',(Eb,C,Ea,Tda,Tdb)) # da db da' db' = s t u v
+    CEETT = torch.einsum('ije,ef,fga,jlk,lgp->ikap',(Eb,C,Ea,Ta,Tb))
+    CEETdTd = torch.einsum('ije,ef,fga,jlksu,lgptv->ikapstuv',(Eb,C,Ea,Tda,Tdb)) # da db da' db' = s t u v
     Rho = torch.einsum('ijkl,klpq,pqijstuv->stuv',(CEETT,CEETT,CEETdTd))  # s t u v =  da db da' db' 
     Rho = Rho.reshape(d**2,d**2)  # dbda db'da'
     
     Rho = 0.5*(Rho + torch.conj(Rho.t()))
     Rho = Rho/Rho.trace()
 
-
     return Rho
-
-
 
 def get_obs_honeycomb(A1symm, A2symm, H, Sx, Sy, Sz, C, Ea, Eb):
     
@@ -79,8 +78,6 @@ def get_obs_honeycomb(A1symm, A2symm, H, Sx, Sy, Sz, C, Ea, Eb):
 
     eig1, lambda1 = torch.linalg.eig(Rho1)
     eig2, lambda2 = torch.linalg.eig(Rho2)
-    
-    # print((eig1 - eig2).norm())
-    
-    return Ener1,Ener2, Mx, My, Mz
+        
+    return Ener1, Ener2, Mx, My, Mz
 
