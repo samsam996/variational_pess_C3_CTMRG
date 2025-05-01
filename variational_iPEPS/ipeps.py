@@ -4,7 +4,10 @@ sys.path.insert(0, '../')
 import torch 
 import time
 from tensornets import CTMRG_honeycomb
+from tensornets import CTMRG_honeycomb_pess
 from measure import get_obs_honeycomb
+from measure import get_energy_pess
+
 from args import args
 
 class honeycombiPEPS(torch.nn.Module):
@@ -78,9 +81,9 @@ class honeycombiPEPS(torch.nn.Module):
             ener_array.append(enerab1)
             ener_array.append(enerab2)
 
-        print('1 :', enerab0)
-        print('2 :', enerab1)
-        print('3 :', enerab2)
+        # print('1 :', enerab0)
+        # print('2 :', enerab1)
+        # print('3 :', enerab2)
         
         # print('4 :', enerba0)
         # print('5 :', enerba1)
@@ -99,3 +102,56 @@ class honeycombiPEPS(torch.nn.Module):
 
 
 
+
+
+
+
+class honeycombiPESS(torch.nn.Module):
+
+    def __init__(self, args, dtype=torch.float64, device='cpu', use_checkpoint=False):
+        super(honeycombiPESS, self).__init__()
+        self.d = args.d
+        self.D = args.D
+        self.chi = args.chi
+        self.Niter = args.Niter
+        self.use_checkpoint = use_checkpoint 
+        
+        d, D = self.d, self.D
+        
+        B1 = (torch.rand(d, D, D, D, dtype=dtype, device=device))
+        B1 = B1/B1.norm()
+        B2 = (torch.rand(D, D, D, dtype=dtype, device=device))
+        B2 = B2/B2.norm()
+
+        self.A1 = torch.nn.Parameter(B1)
+        self.A2 = torch.nn.Parameter(B2)
+        
+    def forward(self, H, Mpx, Mpy, Mpz, chi, dtype):
+        
+        d, D, chi, Niter = self.d, self.D, self.chi, self.Niter
+         
+        A1symm = self.A1.permute(0,1,2,3) +  self.A1.permute(0,2,3,1) + self.A1.permute(0,3,1,2) 
+        A2symm = self.A2.permute(0,1,2) +  self.A2.permute(1,2,0) + self.A2.permute(2,0,1) 
+
+        A1symm = A1symm/A1symm.norm()
+        A2symm = A2symm/A2symm.norm()
+            
+        """
+        definition of local tensors, here named Ta and Tb
+        """
+        Ta = torch.einsum('mefg,mabc->eafbgc',(A1symm,torch.conj(A1symm))).reshape(D**2, D**2, D**2)
+        Tb = torch.einsum('efg,abc->eafbgc',(A2symm,torch.conj(A2symm))).reshape(D**2, D**2, D**2)
+
+        M = [Mpx, Mpy, Mpz]
+        C, Ea, Eb = CTMRG_honeycomb_pess(Ta, Tb, H[0], M, A1symm, A2symm, chi, Niter, dtype, self.use_checkpoint) 
+
+        loss = 0
+        ener = get_energy_pess(A1symm, A2symm, H[0], C, Ea, Eb)
+            
+        loss = torch.real(ener)
+        Mx = 0
+        My = 0
+        Mz = 0
+
+        return loss , Mx, My, Mz 
+    

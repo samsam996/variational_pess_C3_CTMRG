@@ -15,6 +15,7 @@ import subprocess
 from utils import kronecker_product as kron
 from utils import save_checkpoint, load_checkpoint
 from ipeps import honeycombiPEPS
+from ipeps import honeycombiPESS
 from args import args
 
 
@@ -36,7 +37,8 @@ if __name__=='__main__':
     
     print ('use', dtype)
 
-    model = honeycombiPEPS(args, dtype, device, args.use_checkpoint)
+    # model = honeycombiPEPS(args, dtype, device, args.use_checkpoint)
+    model = honeycombiPESS(args, dtype, device, args.use_checkpoint)
 
     if args.load is not None:
         try:
@@ -46,6 +48,7 @@ if __name__=='__main__':
             print('not found:', args.load)
 
     optimizer =  torch.optim.Adam(model.parameters(), lr=1e-3)
+    # optimizer = torch.optim.LBFGS(model.parameters(), max_iter=20)
 
     params = list(model.parameters())
     params = list(filter(lambda p: p.requires_grad, params))
@@ -74,16 +77,42 @@ if __name__=='__main__':
         # Hamiltonian operators on a bond
         # sy is not defined with imaginary numbers!!
 
+        sy = torch.tensor([[0, -1], [1, 0]], dtype=dtype, device=device)*0.5
         sx = torch.tensor([[0, 1], [1, 0]], dtype=dtype, device=device)*0.5
         sp = torch.tensor([[0, 1], [0, 0]], dtype=dtype, device=device)
         sm = torch.tensor([[0, 0], [1, 0]], dtype=dtype, device=device)
         sz = torch.tensor([[1, 0], [0, -1]], dtype=dtype, device=device)*0.5
         id2 = torch.tensor([[1, 0], [0, 1]], dtype=dtype, device=device)
 
+        def Ry(theta):
+            return np.cos(theta/2)*id2 + np.sin(theta/2)*sy*2
+
         # now assuming Jz>0, Jxy > 0
         # We flip the spin on one of the sub-lattice to get back to a one-site unit cell in the iPEPS wavefunction.
-        # h = 2*kron(sz,sz)+(kron(sm, sp)+kron(sp,sm))
-        h = 2*kron(sz,4*sx@sz@sx)-(kron(sm, 4*sx@sp@sx)+kron(sp,4*sx@sm@sx))
+        # h = 2*kron(sz, Ry(2*np.pi/3)@sz@Ry(2*np.pi/3).t())+(kron(sm, Ry(2*np.pi/3)@sp@Ry(2*np.pi/3).t())+kron(sp,Ry(2*np.pi/3)@sm@Ry(2*np.pi/3).t()))
+        # h = 2*kron(sz,4*sx@sz@sx)-(kron(sm, 4*sx@sp@sx)+kron(sp,4*sx@sm@sx))
+        # H = [h/2]
+        theta1 = 0.
+        theta2 = -2*np.pi/3
+        theta3 = -4*np.pi/3
+        
+        # h = kron(sz, Ry(theta2)@sz@Ry(theta2).t())+(kron(sx, Ry(theta2)@sx@Ry(theta2).t())+kron(sy,Ry(theta2)@sy@Ry(theta2).t()))
+
+        sm1 = Ry(theta1)@sm@Ry(theta1).t()
+        sp1 = Ry(theta1)@sp@Ry(theta1).t()
+        sz1 = Ry(theta1)@sz@Ry(theta1).t()
+
+        sm2 = Ry(theta2)@sm@Ry(theta2).t()
+        sp2 = Ry(theta2)@sp@Ry(theta2).t()
+        sz2 = Ry(theta2)@sz@Ry(theta2).t()
+
+        sm3 = Ry(theta3)@sm@Ry(theta3).t()
+        sp3 = Ry(theta3)@sp@Ry(theta3).t()
+        sz3 = Ry(theta3)@sz@Ry(theta3).t()
+
+        h =  2*kron(kron(id2, sz2), sz3) + kron(kron(id2, sm2), sp3) + kron(kron(id2, sp2), sm3) # 23
+        h += 2*kron(kron(sz1, id2), sz3) + kron(kron(sm1, id2), sp3) + kron(kron(sp1, id2), sm3) # 13
+        h += 2*kron(kron(sz1, sz2), id2) + kron(kron(sm1, sp2), id2) + kron(kron(sp1, sm2), id2) 
 
         H =[h/2]
         
@@ -212,8 +241,7 @@ if __name__=='__main__':
 
 
             # Inside the Need phase.
-            print(Ry(np.pi))
-            print(Rypi)
+
             H1 = Hz(id2,id2,id2,Ry(np.pi),Ry(np.pi),Ry(np.pi)) 
             H2 = Hy(id2,id2,id2,Ry(np.pi),Ry(np.pi),Ry(np.pi)) 
             H3 = Hx(id2,id2,id2,Ry(np.pi),Ry(np.pi),Ry(np.pi)) 
@@ -321,6 +349,15 @@ if __name__=='__main__':
         # Return loss for monitoring
         return loss.item(), Mx, My, Mz
 
+    def closure(H, Mpx, Mpy, Mpz, args, dtype):
+        optimizer.zero_grad()
+        start = time.time()
+        loss, Mx, My, Mz = model.forward(H, Mpx, Mpy, Mpz, args.chi, dtype)
+        forward = time.time()
+        loss.backward()
+        #print (model.A.norm().item(), model.A.grad.norm().item(), loss.item(), Mx.item(), My.item(), Mz.item(), torch.sqrt(Mx**2+My**2+Mz**2).item(), forward-start, time.time()-forward)
+        return loss
+    
     with io.open(key + '.log', 'a', buffering=1, newline='\n') as logfile:
 
         En = 4
@@ -329,9 +366,12 @@ if __name__=='__main__':
         while epoch < args.Nepochs:
             epoch = epoch + 1
 
-            # Train step and get loss and magnetization values
+            """
+            SET OPTIMISER STEP
+            """
             loss, Mx, My, Mz = train_step(H, Mpx, Mpy, Mpz, args, dtype)
-           
+            # loss = closure(H, Mpx, Mpy, Mpz, args, dtype)
+
             # Save checkpoint periodically
             if (epoch % args.save_period == 0):
                 save_checkpoint(key + '/peps.tensor'.format(epoch), model, optimizer)
@@ -339,8 +379,9 @@ if __name__=='__main__':
             with torch.no_grad():
                 Etmp = En
                 En, Mx, My, Mz = model.forward(H, Mpx, Mpy, Mpz, args.chi if args.chi_obs is None else args.chi_obs, dtype)
-                Mg = torch.sqrt(Mx**2 + My**2 + Mz**2)
-                message = ('{} ' + 5 * '{:.8f} ').format(epoch, En*1.5, Mx, My, Mz, Mg)
+                # Mg = torch.sqrt(Mx**2 + My**2 + Mz**2)
+                Mg = 0.
+                message = ('{} ' + 5 * '{:.8f} ').format(epoch, En, Mx, My, Mz, Mg)
                 print('epoch, En, Mx, My, Mz, Mg', message)
                 logfile.write(message + u'\n')
 

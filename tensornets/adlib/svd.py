@@ -12,6 +12,7 @@ def safe_inverse(x, epsilon=1E-12):
 class SVD(torch.autograd.Function):
     @staticmethod
     def forward(self, A):
+
         U, S, V = torch.svd(A)
         self.save_for_backward(U, S, V)
         return U, S, V

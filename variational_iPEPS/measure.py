@@ -1,7 +1,7 @@
 import torch
 
 
-
+# there is definetly a problem here.
 def RhoBA(A1symm, A2symm, C, Ea, Eb):
 
     Da = A1symm.size()
@@ -64,6 +64,45 @@ def RhoAB(A1symm, A2symm,  C, Ea, Eb):
 
     return Rho
 
+def density_matrix_pess(A1symm, A2symm, C, Ea, Eb):
+    
+    Da = A1symm.size()
+    D = Da[1]
+    d = Da[0]
+
+    Tda = torch.einsum('mefg,nabc->eafbgcmn',(A1symm,torch.conj(A1symm))).reshape(D**2, D**2, D**2, d, d)    
+    Ta = torch.einsum('mefg,mabc->eafbgc',(A1symm,torch.conj(A1symm))).reshape(D**2, D**2, D**2)
+
+    Tb = torch.einsum('efg,abc->eafbgc',(A2symm,torch.conj(A2symm))).reshape(D**2, D**2, D**2)
+
+    
+    #    C -f--- Ea -- a
+    #    |e      |g
+    #    |       Tb -- p
+    #    |      / l  
+    #    Eb-j-Ta 
+    #    |    |
+    #    i    k
+    # 
+    # Ta : jlk and Tb : lgp    
+
+    ### COMPUTING ENER 1
+
+    CEETT = torch.einsum('ije,ef,fga,jlk,lgp->ikap',(Eb,C,Ea,Ta,Tb))
+    CEETdT = torch.einsum('ije,ef,fga,jlksu,lgp->ikapsu',(Eb,C,Ea,Tda,Tb)) # da db da' db' = s t u v
+ 
+    # Rho = torch.einsum('ijap,aplmsu,lmijtv->stuv',(CEETT,CEETdT,CEETdT))  # s t u v =  da db da' db' 
+    # Rho = Rho.reshape(d**2,d**2)  # dbda db'da'
+    Rho = torch.einsum('ijaprw,aplmsu,lmijtv->rstwuv',(CEETdT,CEETdT,CEETdT))  # s t u v =  da db da' db' 
+    Rho = Rho.reshape(d**3,d**3)  # dbda db'da'
+
+
+    # print(torch.norm(Rho - Rho.t()))    
+    # Rho = 0.5*(Rho + torch.conj(Rho.t()))
+    Rho = Rho/Rho.trace()
+
+    return Rho
+
 def get_obs_honeycomb(A1symm, A2symm, H, Sx, Sy, Sz, C, Ea, Eb):
     
     Rho1 = RhoAB(A1symm, A2symm, C, Ea, Eb)
@@ -80,4 +119,12 @@ def get_obs_honeycomb(A1symm, A2symm, H, Sx, Sy, Sz, C, Ea, Eb):
     eig2, lambda2 = torch.linalg.eig(Rho2)
         
     return Ener1, Ener2, Mx, My, Mz
+
+
+def get_energy_pess(A1symm, A2symm, H, C, Ea, Eb):
+
+    Rho = density_matrix_pess(A1symm, A2symm, C, Ea, Eb)
+    Ener = torch.mm(Rho, H).trace()
+
+    return Ener
 

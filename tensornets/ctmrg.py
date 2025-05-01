@@ -2,6 +2,7 @@ import torch
 from torch.utils.checkpoint import checkpoint
 
 from variational_iPEPS import get_obs_honeycomb
+from variational_iPEPS import get_energy_pess
 
 from .adlib import SVD 
 svd = SVD.apply
@@ -28,9 +29,15 @@ def renormalize_honeycomb(*tensors):
     dimT = Ta.shape[0]
     D_new = min(dimEb1*dimT, chi) 
 
+    Ta = Ta/Ta.max()
+    Tb = Tb/Tb.max()
+    C = C/C.max()
+    Eb = Eb/Eb.max()
+    Ea = Ea/Ea.max()
+
     CEETT = torch.einsum('ije,ef,fga,jlk,lgp->ikap',(Eb,C,Ea,Ta,Tb))
     CEETT = CEETT.reshape(dimEb1*dimT, dimEa3*dimT)  # Rho(i,a,k,p) => Rho(i,k,a,p) => Rho(ki, pa)
-    CEETT = CEETT/CEETT.norm()
+    CEETT = CEETT/CEETT.max()
 
     # U, S, V = svd(CEETT@CEETT@CEETT) 
     U, S, V = svd(CEETT) 
@@ -39,7 +46,6 @@ def renormalize_honeycomb(*tensors):
     P = U[:, :D_new] 
     C = P.t()@CEETT@P
 
-    
 
     # i--Ea -k- |
     #    | j     P - q   = Eb(ilq)
@@ -58,9 +64,9 @@ def renormalize_honeycomb(*tensors):
     Eb = Ebtmp.clone()
     Ea = Eatmp.clone()
 
-    C = C/C.norm() 
-    Ea = Ea/Ea.norm()
-    Eb = Eb/Eb.norm()
+    C = C/C.max() 
+    Ea = Ea/Ea.max()
+    Eb = Eb/Eb.max()
 
     return C, Ea, Eb, S/S.norm(), truncation_error
 
@@ -96,7 +102,7 @@ def CTMRG_honeycomb(Ta, Tb, H, M, A1symm, A2symm, chi, max_iter, dtype, use_chec
         ener2, enerf, Mx, My, Mz = get_obs_honeycomb(A1symm, A2symm, H[0], M[0], M[1], M[2], C2, Ea2, Eb2)
         
         diff = abs(ener + ener1 + ener2 - Etmp)
-        print(diff)
+        # print(diff)
         if use_checkpoint: # use checkpoint to save memory 
             C, Ea, Eb, s, error = checkpoint(renormalize_honeycomb, *tensors0) 
         else:
@@ -115,5 +121,42 @@ def CTMRG_honeycomb(Ta, Tb, H, M, A1symm, A2symm, chi, max_iter, dtype, use_chec
 
 
     return C0, Ea0, Eb0, C1, Ea1, Eb1, C2, Ea2, Eb2
+
+
+
+
+
+def CTMRG_honeycomb_pess(Ta, Tb, H, M, A1symm, A2symm, chi, max_iter, dtype, use_checkpoint=False):
+
+    threshold = 1E-7 
+
+    C = torch.ones((1,1), dtype=dtype, device= Ta.device)
+    Ea = torch.ones((1,1,1),dtype=dtype, device= Ta.device)
+    Eb = torch.ones((1,1,1),dtype=dtype, device= Ta.device)
+    
+    diff = 1E1
+    ener = 0
+    tensors = C, Ea, Eb, Ta, Tb, torch.tensor(chi)
+
+    for n in range(max_iter):
+
+        Etmp = ener 
+        ener = get_energy_pess(A1symm, A2symm, H, C, Ea, Eb)
+        
+        diff = abs(ener - Etmp)
+
+        if use_checkpoint: # use checkpoint to save memory 
+            C, Ea, Eb, s, error = checkpoint(renormalize_honeycomb, *tensors) 
+        else:
+            C, Ea, Eb, s, error = renormalize_honeycomb(*tensors)
+            tensors = C, Ea, Eb, Ta, Tb, torch.tensor(chi)
+            
+        if (diff < threshold):
+            break
+        if n == max_iter-1:
+            print('ctm not converged')
+
+
+    return C, Ea, Eb
 
 
