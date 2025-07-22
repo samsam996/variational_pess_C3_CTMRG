@@ -16,7 +16,10 @@ pip install -r requirements.txt
 
 To use the program, run the following command:
 ```bash
-python main.py -D=3 -chi=30 -dtype="float32"
+python main.py -D=3 -chi=30 -dtype="float64" --model="PESS"
 ``` 
-
-
+for the triangular lattice and 
+```bash
+python main.py -D=3 -chi=30 -dtype="float64" --model="PEPS"
+``` 
+for the honeycomb lattice.
