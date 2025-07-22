@@ -11,7 +11,7 @@ Installation:
 ```bash
 python3 -m venv myenv
 source myenv/bin/activate
-pip install -r variational_iPEPS/requirements.txt
+pip install -r requirements.txt
 ```
 
 To use the program, run the following command:
