@@ -1,6 +1,6 @@
 
 
-### Variational optimization of iPEPS with the C3 honeycomb CTMRG
+### Variational optimization of iPEPS and iPESS wavefunctions with the C3 honeycomb CTMRG
 
 Computes the energy of the Heisenberg model on the honeycomb and triangular lattice using iPEPS and iPESS wavefunctions defined on a honeycomb lattice. The optimisation is made by minimising the energy with pytorch. The energy is computed by contracting the 2D tensor network with the C3 symmetric honeycomb corner transfer matrix renormalisation group algorithm (https://arxiv.org/abs/2306.09046).
 
