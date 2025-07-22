@@ -4,16 +4,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-# Lists to store first and second column values
-
 e_monte_carlo = -0.544553
 colors = ['b','r','g','m','c']
-chi_ = [10,20,30,40,50]
+chi_list = [20]
+index_max = [1,1,1,1,1]
+D = 4
 i = 0
+energy_final = []
 
-for chi in chi_:
-    # chi = 30
-    D = 3
+for k in range(len(chi_list)):
+
+    chi = chi_list[k]
     col1, col2 = [], []
     model = "Heisenberg"
     # Read the log file
@@ -28,16 +29,28 @@ for chi in chi_:
                 # Skip lines that don't have enough columns or contain non-numeric values
                 continue
 
-    # Plotting the data
-    plt.plot(col1, (col2), marker='.', linestyle='', color=colors[i], label=f'chi={chi}')
+    iterations = col1
+    energy = col2
+    xx, cv  = [], []
+    for j in range(len(iterations)-1):
+        xx.append((iterations[j] + iterations[j+1])/2)
+        cv.append((energy[j] - energy[j+1])/(iterations[j] - iterations[j+1]))
+
+
+    energy_final.append(energy[index_max[k]])
+  
+  
+    plt.plot(iterations, energy, marker='.', linestyle='', color=colors[k], label=f'chi={chi}')
     plt.xlabel('iteration')
     plt.ylabel('Energy')
     plt.title(f'D={D}')
     plt.grid(True)
-    plt.savefig(f'figures/D{D}chi{chi}.png', dpi=300) 
-    # plt.savefig(f'D{D}chi{chi}.pdf', dpi=300) 
-    print(i)
-    i += 1
+    plt.savefig(f'figures_peps/D{D}chi{chi}.png', dpi=300) 
+    plt.savefig(f'D{D}chi{chi}.pdf', dpi=300) 
+
+
 
 plt.legend()
 plt.show()
+
+

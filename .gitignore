@@ -3,4 +3,5 @@ __pycache__
 .DS_Store
 data/
 myenv/
-figures/
+figures_peps/
+figures_pess/

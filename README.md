@@ -13,6 +13,13 @@ conda create --name var_ipeps python=3.8
 conda activate var_ipeps
 pip install -r variational_iPEPS/requirements.txt
 ```
+Installation using conda :
+```bash
+python3 -m venv myenv
+source myenv/bin/activate
+pip install -r variational_iPEPS/requirements.txt
+```
+
 
 To use the program, run the following command:
 ```bash

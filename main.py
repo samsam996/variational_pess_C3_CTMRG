@@ -1,8 +1,3 @@
-'''
-Variational PEPS with automatic differentiation and GPU support
-'''
-
-# I don't like the ctm convergence criteria on s(end), I want it on the energy !!
 
 
 import sys
@@ -12,15 +7,17 @@ import numpy as np
 torch.set_num_threads(1)
 torch.manual_seed(1879)
 import subprocess
-from utils import kronecker_product as kron
-from utils import save_checkpoint, load_checkpoint
-from ipeps import honeycombiPEPS
-from ipeps import honeycombiPESS
-from args import args
+from src.utils import kronecker_product as kron
+from src.utils import save_checkpoint, load_checkpoint
+from src.ipeps import honeycombiPEPS
+from src.ipeps import honeycombiPESS
+from src.args import args
 
 
 
 if __name__=='__main__':
+
+    print('\n BEGIN SIMULATION \n')
 
     import time
     device = torch.device("cpu" if args.cuda<0 else "cuda:"+str(args.cuda))
@@ -35,10 +32,11 @@ if __name__=='__main__':
     else:
         dtype = torch.cfloat
     
-    print ('use', dtype)
 
-    # model = honeycombiPEPS(args, dtype, device, args.use_checkpoint)
-    model = honeycombiPESS(args, dtype, device, args.use_checkpoint)
+    if args.ansatz == 'PEPS':
+        model = honeycombiPEPS(args, dtype, device, args.use_checkpoint)
+    elif args.ansatz == 'PESS':
+        model = honeycombiPESS(args, dtype, device, args.use_checkpoint)
 
     if args.load is not None:
         try:
@@ -48,56 +46,45 @@ if __name__=='__main__':
             print('not found:', args.load)
 
     optimizer =  torch.optim.Adam(model.parameters(), lr=1e-3)
-    # optimizer = torch.optim.LBFGS(model.parameters(), max_iter=20)
 
     params = list(model.parameters())
     params = list(filter(lambda p: p.requires_grad, params))
     nparams = sum([np.prod(p.size()) for p in params])
     print ('total nubmer of trainable parameters:', nparams)
 
-    key = args.folder
-    key += args.model \
-          + '_D' + str(args.D) \
-          + '_chi' + str(args.chi)
-    if args.dtype=="float32": #(args.float32):
+    key = f'{args.folder}{args.model}_D{args.D}_chi{args.chi}'
+    file_path_tensors = f'{args.folder}{args.model}_D{args.D}'
+
+    if args.dtype=="float32": 
         key += '_float32'
-    elif args.dtype=="float64": #(args.float32):
+    elif args.dtype=="float64":
         key += '_float64'
-    if args.dtype=="cfloat": #(args.float32):
+    if args.dtype=="cfloat": 
         key += '_cfloat'    
 
     if args.model=='maple_leaf':
         key += f'_Jd{args.Jd:.2f}_Jt{args.Jt:.2f}'
 
-    cmd = ['mkdir', '-p', key]
+    cmd = ['mkdir', '-p', file_path_tensors]
     subprocess.check_call(cmd)
 
+    sy = torch.tensor([[0, -1], [1, 0]], dtype=dtype, device=device)*0.5
+    sx = torch.tensor([[0, 1], [1, 0]], dtype=dtype, device=device)*0.5
+    sp = torch.tensor([[0, 1], [0, 0]], dtype=dtype, device=device)
+    sm = torch.tensor([[0, 0], [1, 0]], dtype=dtype, device=device)
+    sz = torch.tensor([[1, 0], [0, -1]], dtype=dtype, device=device)*0.5
+    id2 = torch.tensor([[1, 0], [0, 1]], dtype=dtype, device=device)
 
-    if args.model == 'Heisenberg':
-        # Hamiltonian operators on a bond
-        # sy is not defined with imaginary numbers!!
 
-        sy = torch.tensor([[0, -1], [1, 0]], dtype=dtype, device=device)*0.5
-        sx = torch.tensor([[0, 1], [1, 0]], dtype=dtype, device=device)*0.5
-        sp = torch.tensor([[0, 1], [0, 0]], dtype=dtype, device=device)
-        sm = torch.tensor([[0, 0], [1, 0]], dtype=dtype, device=device)
-        sz = torch.tensor([[1, 0], [0, -1]], dtype=dtype, device=device)*0.5
-        id2 = torch.tensor([[1, 0], [0, 1]], dtype=dtype, device=device)
+    if args.model == 'Heisenberg' and args.ansatz == 'PESS':
 
         def Ry(theta):
             return np.cos(theta/2)*id2 + np.sin(theta/2)*sy*2
 
-        # now assuming Jz>0, Jxy > 0
-        # We flip the spin on one of the sub-lattice to get back to a one-site unit cell in the iPEPS wavefunction.
-        # h = 2*kron(sz, Ry(2*np.pi/3)@sz@Ry(2*np.pi/3).t())+(kron(sm, Ry(2*np.pi/3)@sp@Ry(2*np.pi/3).t())+kron(sp,Ry(2*np.pi/3)@sm@Ry(2*np.pi/3).t()))
-        # h = 2*kron(sz,4*sx@sz@sx)-(kron(sm, 4*sx@sp@sx)+kron(sp,4*sx@sm@sx))
-        # H = [h/2]
         theta1 = 0.
         theta2 = -2*np.pi/3
         theta3 = -4*np.pi/3
         
-        # h = kron(sz, Ry(theta2)@sz@Ry(theta2).t())+(kron(sx, Ry(theta2)@sx@Ry(theta2).t())+kron(sy,Ry(theta2)@sy@Ry(theta2).t()))
-
         sm1 = Ry(theta1)@sm@Ry(theta1).t()
         sp1 = Ry(theta1)@sp@Ry(theta1).t()
         sz1 = Ry(theta1)@sz@Ry(theta1).t()
@@ -115,23 +102,96 @@ if __name__=='__main__':
         h += 2*kron(kron(sz1, sz2), id2) + kron(kron(sm1, sp2), id2) + kron(kron(sp1, sm2), id2) 
 
         H =[h/2]
-        
     
+        Mpz = kron(sz, kron(id2, id2))
+        Mpx = kron(sx, kron(id2, id2))
+        Mpy = kron(sy, kron(id2, id2))
+
+
+    elif args.ansatz == 'PEPS':
+
+        h = 2*kron(sz,4*sx@sz@sx)-(kron(sm, 4*sx@sp@sx)+kron(sp,4*sx@sm@sx))
+        H = [h/2]
+
         Mpx = kron(sx, id2)
         Mpy = kron(sp, id2)
         Mpz = kron(sm, id2)
 
+
+    else:
+        print ('please, choose a valid model')
+        sys.exit(1)
+
+    def train_step(H, Mpx, Mpy, Mpz, args, dtype):
+
+        optimizer.zero_grad()
+        start = time.time()
+        loss, Mx, My, Mz = model.forward(H, Mpx, Mpy, Mpz, args.chi, dtype)
+        loss.backward()
+        optimizer.step()
+        forward = time.time()
+
+        return loss.item(), Mx, My, Mz
+
+    with io.open(key + '.log', 'a', buffering=1, newline='\n') as logfile:
+
+        En = 4
+        Etmp = 5
+        epoch = 0
+        while epoch < args.Nepochs:
+            epoch = epoch + 1
+
+            loss, Mx, My, Mz = train_step(H, Mpx, Mpy, Mpz, args, dtype)
+
+            if (epoch % args.save_period == 0):
+                pass
+            with torch.no_grad():
+
+                Etmp = En
+                En, Mx, My, Mz = model.forward(H, Mpx, Mpy, Mpz, args.chi if args.chi_obs is None else args.chi_obs, dtype)
+                Mg = torch.sqrt(Mx**2 + My**2 + Mz**2)
+                
+                message = ('{} ' + 5 * '{:.16f} ').format(epoch, En, Mx, My, Mz, Mg)
+                print('epoch, En, Mx, My, Mz, Mg', message)
+                logfile.write(message + u'\n')
+
+                save_checkpoint(f'{file_path_tensors}/peps.tensor', model, optimizer)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"""
+
     elif args.model == 'maple_leaf':
             
-            # For now we assume to be in the Neel phase
-            sx = torch.tensor([[0, 1], [1, 0]], dtype=dtype, device=device)*0.5
-            sy = torch.tensor([[0, -1], [1, 0]], dtype=dtype, device=device)*0.5
-
-            sp = torch.tensor([[0, 1], [0, 0]], dtype=dtype, device=device)
-            sm = torch.tensor([[0, 0], [1, 0]], dtype=dtype, device=device)
-            sz = torch.tensor([[1, 0], [0, -1]], dtype=dtype, device=device)*0.5
-            id2 = torch.tensor([[1, 0], [0, 1]], dtype=dtype, device=device)
-
             Rypi = torch.tensor([[0, -1], [1, 0]], dtype=dtype, device=device)
 
 
@@ -277,112 +337,5 @@ if __name__=='__main__':
             Mpy = kron(kron(kron(id2,sy),kron(id2,id2)),kron(id2,id2))
             Mpz = kron(kron(kron(id2,sz),kron(id2,id2)),kron(id2,id2))
 
-    elif args.model == 'SO(4)':
 
-
-            sx = torch.tensor([[0, 1], [1, 0]], dtype=dtype, device=device)*0.5
-            sy = torch.tensor([[0, -1], [1, 0]], dtype=dtype, device=device)*0.5
-            sp = torch.tensor([[0, 1], [0, 0]], dtype=dtype, device=device)
-            sm = torch.tensor([[0, 0], [1, 0]], dtype=dtype, device=device)
-            sz = torch.tensor([[1, 0], [0, -1]], dtype=dtype, device=device)*0.5
-            id2 = torch.tensor([[1, 0], [0, 1]], dtype=dtype, device=device)
-            
-            def Ry(theta):
-                return np.cos(theta/2)*id2 + np.sin(theta/2)*sy*2
-
-
-            theta = np.pi
-
-            tp = sp
-            tm = sm
-            tz = sz
-
-
-            Mpz = kron(kron(sz,id2),kron(id2,id2))
-            Mpx = kron(kron(sp,id2),kron(id2,id2))
-            Mpy = kron(kron(sm,id2),kron(id2,id2))
-
-            hy =        kron(kron(sp,id2),kron(Ry(theta)@sm@Ry(theta).t(),id2))/2 
-            hy = hy +   kron(kron(sm,id2),kron(Ry(theta)@sp@Ry(theta).t(),id2))/2 
-            hy = hy +   kron(kron(sz,id2),kron(Ry(theta)@sz@Ry(theta).t(),id2))
-
-            hy = hy +   kron(kron(id2,tp),kron(id2,Ry(theta)@tm@Ry(theta).t()))/2 
-            hy = hy +   kron(kron(id2,tm),kron(id2,Ry(theta)@tp@Ry(theta).t()))/2
-            hy = hy +   kron(kron(id2,tz),kron(id2,Ry(theta)@tz@Ry(theta).t()))
-
-            hy = hy + 4*(kron(kron(sp,tp),kron(Ry(theta)@sm@Ry(theta).t(),Ry(theta)@tm@Ry(theta).t()))/4 + \
-                         kron(kron(sp,tm),kron(Ry(theta)@sm@Ry(theta).t(),Ry(theta)@tp@Ry(theta).t()))/4 + \
-                         kron(kron(sp,tz),kron(Ry(theta)@sm@Ry(theta).t(),Ry(theta)@tz@Ry(theta).t()))/2)
-            
-            hy = hy + 4*(kron(kron(sm,tp),kron(Ry(theta)@sp@Ry(theta).t(),Ry(theta)@tm@Ry(theta).t()))/4 + \
-                         kron(kron(sm,tm),kron(Ry(theta)@sp@Ry(theta).t(),Ry(theta)@tp@Ry(theta).t()))/4 + \
-                         kron(kron(sm,tz),kron(Ry(theta)@sp@Ry(theta).t(),Ry(theta)@sz@Ry(theta).t()))/2)
-            
-            hy = hy + 4*(kron(kron(sz,tp),kron(Ry(theta)@sz@Ry(theta).t(),Ry(theta)@tm@Ry(theta).t()))/2 + \
-                         kron(kron(sz,tm),kron(Ry(theta)@sz@Ry(theta).t(),Ry(theta)@tp@Ry(theta).t()))/2 + \
-                         kron(kron(sz,tz),kron(Ry(theta)@sz@Ry(theta).t(),Ry(theta)@tz@Ry(theta).t())))
-
-            hy = hy + 1/4*kron(kron(id2,id2),kron(id2,id2))
-
-            H = [hy]
-
-    else:
-        print ('please, choose a valid model')
-        sys.exit(1)
-
-    print ('Hamiltonian:\n', H)
-
-    # for the ADAM optimiser
-    def train_step(H, Mpx, Mpy, Mpz, args, dtype):
-        # Zero the gradients from the previous step
-        optimizer.zero_grad()
-        # Start the timer for performance measurement
-        start = time.time()
-        # Perform a forward pass through the model
-        loss, Mx, My, Mz = model.forward(H, Mpx, Mpy, Mpz, args.chi, dtype)
-        # Perform backpropagation to compute gradients
-        loss.backward()
-        # Update weights using the optimizer
-        optimizer.step()
-        # Record the time taken for the forward pass
-        forward = time.time()
-        # Return loss for monitoring
-        return loss.item(), Mx, My, Mz
-
-    def closure(H, Mpx, Mpy, Mpz, args, dtype):
-        optimizer.zero_grad()
-        start = time.time()
-        loss, Mx, My, Mz = model.forward(H, Mpx, Mpy, Mpz, args.chi, dtype)
-        forward = time.time()
-        loss.backward()
-        #print (model.A.norm().item(), model.A.grad.norm().item(), loss.item(), Mx.item(), My.item(), Mz.item(), torch.sqrt(Mx**2+My**2+Mz**2).item(), forward-start, time.time()-forward)
-        return loss
-    
-    with io.open(key + '.log', 'a', buffering=1, newline='\n') as logfile:
-
-        En = 4
-        Etmp = 5
-        epoch = 0
-        while epoch < args.Nepochs:
-            epoch = epoch + 1
-
-            """
-            SET OPTIMISER STEP
-            """
-            loss, Mx, My, Mz = train_step(H, Mpx, Mpy, Mpz, args, dtype)
-            # loss = closure(H, Mpx, Mpy, Mpz, args, dtype)
-
-            # Save checkpoint periodically
-            if (epoch % args.save_period == 0):
-                save_checkpoint(key + '/peps.tensor'.format(epoch), model, optimizer)
-
-            with torch.no_grad():
-                Etmp = En
-                En, Mx, My, Mz = model.forward(H, Mpx, Mpy, Mpz, args.chi if args.chi_obs is None else args.chi_obs, dtype)
-                # Mg = torch.sqrt(Mx**2 + My**2 + Mz**2)
-                Mg = 0.
-                message = ('{} ' + 5 * '{:.8f} ').format(epoch, En, Mx, My, Mz, Mg)
-                print('epoch, En, Mx, My, Mz, Mg', message)
-                logfile.write(message + u'\n')
-
-
+"""

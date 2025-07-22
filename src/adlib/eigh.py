@@ -10,8 +10,9 @@ import torch
 class EigenSolver(torch.autograd.Function):
     @staticmethod
     def forward(self, A):
-        w, v = torch.symeig(A, eigenvectors=True)
-
+        # w, v = torch.symeig(A, eigenvectors=True)
+        w, v = w, v = torch.linalg.eigh(A)
+        
         self.save_for_backward(w, v)
         return w, v
 
