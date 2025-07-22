@@ -11,7 +11,7 @@ parser.add_argument("-Niter", type=int, default=100, help="Niter")
 parser.add_argument("-Jz", type=float, default=1.0, help="Jz")
 parser.add_argument("-Jxy", type=float, default=1.0, help="Jxy")
 parser.add_argument("-hx", type=float, default=1.0, help="hx")
-parser.add_argument("-model", default='Heisenberg', choices=['maple_leaf', 'Heisenberg'], help="model name")
+parser.add_argument("-model", default='Heisenberg', choices=['Heisenberg'], help="model name")
 
 parser.add_argument("-ansatz", default='PESS', choices=['PEPS', 'PESS'], help="ansatz")
 
